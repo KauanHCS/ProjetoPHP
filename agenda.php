@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banca de TCC - Página Inicial</title>
+    <title>Agenda de Bancas de TCC</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <header>
-        <h1>Sistema de Bancas de TCC</h1>
+        <h1>Agenda de Bancas de TCC</h1>
         <nav>
             <ul>
                 <li><a href="index.php">Home</a></li>
@@ -20,30 +20,45 @@
     </header>
 
     <main>
-        <section class="hero">
-            <h2>Bem-vindo ao Sistema de Bancas de TCC</h2>
-            <p>Gerencie as apresentações de trabalho de conclusão de curso de forma eficiente.</p>
-            <a href="agenda.php" class="btn">Ver Agenda</a>
-        </section>
+        <section class="agenda">
+            <h2>Bancas Agendadas</h2>
+            
+            <div class="filtros">
+                <form method="GET" action="agenda.php">
+                    <div class="form-group">
+                        <label for="data_filtro">Filtrar por data:</label>
+                        <input type="date" id="data_filtro" name="data_filtro">
+                        <button type="submit" class="btn">Filtrar</button>
+                        <a href="agenda.php" class="btn">Limpar</a>
+                    </div>
+                </form>
+            </div>
 
-        <section class="proximas-bancas">
-            <h2>Próximas Bancas</h2>
             <?php
-            $stmt = $pdo->query("SELECT * FROM bancas WHERE data_apresentacao >= CURDATE() ORDER BY data_apresentacao LIMIT 3");
+            $where = '';
+            if (isset($_GET['data_filtro']) && !empty($_GET['data_filtro'])) {
+                $data_filtro = $_GET['data_filtro'];
+                $where = " WHERE data_apresentacao = '{$data_filtro}'";
+            }
+
+            $stmt = $pdo->query("SELECT * FROM bancas {$where} ORDER BY data_apresentacao, hora_apresentacao");
             $bancas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (count($bancas) > 0) {
+                echo '<div class="bancas-lista">';
                 foreach ($bancas as $banca) {
-                    echo '<div class="banca-card">';
+                    echo '<div class="banca-item">';
                     echo '<h3>' . htmlspecialchars($banca['titulo']) . '</h3>';
                     echo '<p><strong>Aluno:</strong> ' . htmlspecialchars($banca['aluno']) . '</p>';
                     echo '<p><strong>Data:</strong> ' . date('d/m/Y', strtotime($banca['data_apresentacao'])) . '</p>';
                     echo '<p><strong>Hora:</strong> ' . htmlspecialchars($banca['hora_apresentacao']) . '</p>';
+                    echo '<p><strong>Local:</strong> ' . htmlspecialchars($banca['local']) . '</p>';
                     echo '<a href="detalhes.php?id=' . $banca['id'] . '" class="btn">Detalhes</a>';
                     echo '</div>';
                 }
+                echo '</div>';
             } else {
-                echo '<p>Não há bancas agendadas no momento.</p>';
+                echo '<p>Nenhuma banca encontrada.</p>';
             }
             ?>
         </section>
