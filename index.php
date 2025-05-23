@@ -1,58 +1,31 @@
-<?php include 'includes/db.php'; ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banca de TCC - Página Inicial</title>
+    <title>Sistema de Gerenciamento de TCC</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <header>
-        <h1>Sistema de Bancas de TCC</h1>
-        <nav>
-            <ul>
-                <li><a href="index.php">Home</a></li>
-                <li><a href="agenda.php">Agenda</a></li>
-                <li><a href="cadastro.php">Cadastrar Banca</a></li>
-            </ul>
-        </nav>
+        <h1>Sistema de Gerenciamento de TCC</h1>
     </header>
-
-    <main>
-        <section class="hero">
-            <h2>Bem-vindo ao Sistema de Bancas de TCC</h2>
-            <p>Gerencie as apresentações de trabalho de conclusão de curso de forma eficiente.</p>
-            <a href="agenda.php" class="btn">Ver Agenda</a>
-        </section>
-
-        <section class="proximas-bancas">
-            <h2>Próximas Bancas</h2>
-            <?php
-            $stmt = $pdo->query("SELECT * FROM bancas WHERE data_apresentacao >= CURDATE() ORDER BY data_apresentacao LIMIT 3");
-            $bancas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            if (count($bancas) > 0) {
-                foreach ($bancas as $banca) {
-                    echo '<div class="banca-card">';
-                    echo '<h3>' . htmlspecialchars($banca['titulo']) . '</h3>';
-                    echo '<p><strong>Aluno:</strong> ' . htmlspecialchars($banca['aluno']) . '</p>';
-                    echo '<p><strong>Data:</strong> ' . date('d/m/Y', strtotime($banca['data_apresentacao'])) . '</p>';
-                    echo '<p><strong>Hora:</strong> ' . htmlspecialchars($banca['hora_apresentacao']) . '</p>';
-                    echo '<a href="detalhes.php?id=' . $banca['id'] . '" class="btn">Detalhes</a>';
-                    echo '</div>';
-                }
-            } else {
-                echo '<p>Não há bancas agendadas no momento.</p>';
-            }
-            ?>
-        </section>
-    </main>
-
-    <footer>
-        <p>&copy; <?php echo date('Y'); ?> Sistema de Bancas de TCC</p>
-    </footer>
-
+    <nav>
+        <ul>
+            <li><a href="index.php">Home</a></li>
+            <li><a href="cadastro_tcc.php">Cadastrar Novo TCC</a></li>
+            <li><a href="agenda.php">Agenda de Defesas</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <h2>Bem-vindo(a) ao Sistema de Gerenciamento de TCC</h2>
+        <p>Utilize o menu de navegação acima para:</p>
+        <ul>
+            <li><strong>Cadastrar Novo TCC:</strong> Registre as informações de um novo Trabalho de Conclusão de Curso, incluindo título, data de cadastro e tipo.</li>
+            <li><strong>Agenda de Defesas:</strong> Visualize a lista de TCCs com suas respectivas datas e horários de defesa.</li>
+        </ul>
+        <p>Este sistema foi desenvolvido para auxiliar no controle e organização dos Trabalhos de Conclusão de Curso.</p>
+    </div>
     <script src="js/script.js"></script>
 </body>
 </html>
