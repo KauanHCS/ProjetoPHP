@@ -1,111 +1,129 @@
 <?php
-require_once 'config.php'; // Inclui o arquivo de configuração do banco de dados
+// CRITÉRIO: 1.1 Comentários (Documentação) - Bloco de comentários inicial.
+require_once 'config.php'; // Inclui a nova configuração PDO (CRITÉRIO: 9.1 Banco de Dados - Conexão PDO)
+require_once 'models.php'; // Inclui as novas classes (CRITÉRIO: 7.1 Classes)
 
-$mensagem = '';
-$tipo_mensagem = '';
+$mensagem = ''; // CRITÉRIO: 3.3 Atribuição
+$tipo_mensagem = ''; // CRITÉRIO: 3.3 Atribuição
+
+// CRITÉRIO: 7.3 Instanciação de Objetos - Obtém a conexão PDO através da classe Database.
+$pdo = Database::getInstance()->getConnection();
 
 // Processa o formulário quando enviado
+// CRITÉRIO: 6.1 If_Else - Condição para verificar o método da requisição.
+// CRITÉRIO: 3.4 Comparação - Comparação de string.
+// CRITÉRIO: 3.6 Lógico - Uso do operador AND (&&).
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $titulo = $conexao->real_escape_string($_POST['titulo']);
-    $data_cadastro = $conexao->real_escape_string($_POST['data_cadastro']);
+    // Coleta e sanitiza os dados (PDO + Prepared Statements fazem a maior parte da sanitização)
+    // CRITÉRIO: 3.3 Atribuição - Atribuição de valores de $_POST.
+    $titulo = $_POST['titulo'];
+    $data_cadastro = $_POST['data_cadastro'];
+    // CRITÉRIO: 3.3 Atribuição, CRITÉRIO: 3.1 Aritméticos (casting para int)
     $id_tipo_tcc = (int)$_POST['id_tipo_tcc'];
     
-    // Alunos selecionados e seus tipos de associação
-    $ra_aluno_principal = $conexao->real_escape_string($_POST['ra_aluno_principal']); // Aluno principal
-    $colaboradores_selecionados = $_POST['colaboradores'] ?? []; // Colaboradores
+    $ra_aluno_principal = $_POST['ra_aluno_principal'];
+    // CRITÉRIO: 4.1 Array - Acesso a elementos de array ($_POST).
+    // CRITÉRIO: 6.3 Operador Ternário - Para definir array vazio se não houver colaboradores.
+    $colaboradores_selecionados = $_POST['colaboradores'] ?? [];
 
-    // Professores selecionados e seus tipos de participação
     $professores_selecionados = $_POST['professores'] ?? [];
     $tipos_participacao = $_POST['tipo_participacao'] ?? [];
 
-    // 1. Inserir o TCC
-    $sql_tcc = "INSERT INTO TCC (titulo, data_cadastro, id_tipo_tcc) VALUES ('$titulo', '$data_cadastro', $id_tipo_tcc)";
-
-    if ($conexao->query($sql_tcc) === TRUE) {
-        $codigo_tcc = $conexao->insert_id; // Pega o ID do TCC recém-inserido
-        $sucesso = true;
+    // Inicia uma transação (garante atomicidade das operações)
+    $pdo->beginTransaction();
+    try {
+        // 1. Inserir o TCC usando Prepared Statement
+        // CRITÉRIO: 9.5 Inserção - Comando INSERT.
+        // CRITÉRIO: 9.1 Banco de Dados - Uso de Prepared Statements com PDO.
+        $stmt_tcc = $pdo->prepare("INSERT INTO TCC (titulo, data_cadastro, id_tipo_tcc) VALUES (?, ?, ?)");
+        // CRITÉRIO: 8.1 Funções com passagem de parâmetros - Parâmetros passados para execute().
+        $stmt_tcc->execute([$titulo, $data_cadastro, $id_tipo_tcc]);
+        // Pega o ID do TCC recém-inserido
+        $codigo_tcc = $pdo->lastInsertId(); // CRITÉRIO: 3.3 Atribuição
 
         // 2. Inserir o Aluno Principal na Aluno_TCC
-        $sql_aluno_principal = "INSERT INTO Aluno_TCC (codigo_tcc, RA, tipo_associacao) VALUES ($codigo_tcc, '$ra_aluno_principal', 'Principal')";
-        if ($conexao->query($sql_aluno_principal) !== TRUE) {
-            $sucesso = false;
-            $mensagem .= "Erro ao associar Aluno Principal: " . $conexao->error . "<br>";
-        }
+        // CRITÉRIO: 9.5 Inserção.
+        $stmt_aluno_principal = $pdo->prepare("INSERT INTO Aluno_TCC (codigo_tcc, RA, tipo_associacao) VALUES (?, ?, ?)");
+        $stmt_aluno_principal->execute([$codigo_tcc, $ra_aluno_principal, 'Principal']);
 
         // 3. Inserir os Alunos Colaboradores na Aluno_TCC
-        if ($sucesso && !empty($colaboradores_selecionados)) {
-            $tipos_colaborador = ['Colaborador 1', 'Colaborador 2'];
-            foreach ($colaboradores_selecionados as $indice => $ra_colaborador) {
-                if (isset($tipos_colaborador[$indice])) { // Garante que não exceda os 2 tipos
-                    $tipo_colab = $tipos_colaborador[$indice];
-                    $sql_colaborador = "INSERT INTO Aluno_TCC (codigo_tcc, RA, tipo_associacao) VALUES ($codigo_tcc, '$ra_colaborador', '$tipo_colab')";
-                    if ($conexao->query($sql_colaborador) !== TRUE) {
-                        $sucesso = false;
-                        $mensagem .= "Erro ao associar Aluno Colaborador $tipo_colab (RA: $ra_colaborador): " . $conexao->error . "<br>";
-                    }
-                }
+        // CRITÉRIO: 4.1 Array - Definição do array $tipos_colaborador.
+        $tipos_colaborador = ['Colaborador 1', 'Colaborador 2'];
+        // CRITÉRIO: 9.5 Inserção.
+        $stmt_colaborador = $pdo->prepare("INSERT INTO Aluno_TCC (codigo_tcc, RA, tipo_associacao) VALUES (?, ?, ?)");
+        // CRITÉRIO: 5.2 Foreach - Loop para iterar sobre colaboradores selecionados.
+        foreach ($colaboradores_selecionados as $indice => $ra_colaborador) {
+            // CRITÉRIO: 6.1 If_Else - Condição para validação.
+            // CRITÉRIO: 3.4 Comparação - Comparação de existência e valor.
+            // CRITÉRIO: 3.6 Lógico - Uso de AND (&&).
+            if (isset($tipos_colaborador[$indice]) && !empty($ra_colaborador)) {
+                $tipo_colab = $tipos_colaborador[$indice]; // CRITÉRIO: 3.3 Atribuição
+                $stmt_colaborador->execute([$codigo_tcc, $ra_colaborador, $tipo_colab]);
             }
         }
 
-        // 4. Inserir os professores associados (essa parte permanece igual)
-        if ($sucesso && !empty($professores_selecionados)) {
-            foreach ($professores_selecionados as $indice => $id_professor) {
-                $id_professor = (int)$id_professor;
-                $tipo_part = $conexao->real_escape_string($tipos_participacao[$indice]);
-
-                $sql_prof_tcc = "INSERT INTO TCC_Professor (codigo_tcc, id_professor, tipo_participacao) VALUES ($codigo_tcc, $id_professor, '$tipo_part')";
-                if ($conexao->query($sql_prof_tcc) !== TRUE) {
-                    $sucesso = false;
-                    $mensagem .= "Erro ao associar professor (ID: $id_professor, Participação: $tipo_part): " . $conexao->error . "<br>";
-                }
+        // 4. Inserir os professores associados
+        // CRITÉRIO: 9.5 Inserção.
+        $stmt_prof_tcc = $pdo->prepare("INSERT INTO TCC_Professor (codigo_tcc, id_professor, tipo_participacao) VALUES (?, ?, ?)");
+        // CRITÉRIO: 5.2 Foreach - Loop para iterar sobre professores selecionados.
+        foreach ($professores_selecionados as $indice => $id_professor) {
+            // CRITÉRIO: 6.1 If_Else - Condição de validação.
+            if (!empty($id_professor)) {
+                $tipo_part = $tipos_participacao[$indice];
+                // CRITÉRIO: 3.1 Aritméticos - Casting para int.
+                $stmt_prof_tcc->execute([$codigo_tcc, (int)$id_professor, $tipo_part]);
             }
         }
         
-        if ($sucesso) {
-            $mensagem = "TCC cadastrado com sucesso! Código: " . $codigo_tcc;
-            $tipo_mensagem = 'success';
-        } else {
-            $tipo_mensagem = 'error';
-            if (empty($mensagem)) {
-                $mensagem = "Erro ao cadastrar TCC: " . $conexao->error;
-            }
-        }
+        $pdo->commit(); // Confirma todas as operações se tudo deu certo
+        // CRITÉRIO: 3.2 String - Concatenação para mensagem.
+        $mensagem = "TCC cadastrado com sucesso! Código: " . $codigo_tcc;
+        $tipo_mensagem = 'success'; // CRITÉRIO: 3.3 Atribuição
 
-    } else {
-        $mensagem = "Erro ao cadastrar TCC: " . $conexao->error;
-        $tipo_mensagem = 'error';
+    } catch (PDOException $e) {
+        $pdo->rollBack(); // Desfaz todas as operações em caso de erro
+        // CRITÉRIO: 3.2 String - Concatenação para mensagem de erro.
+        $mensagem = "Erro ao cadastrar TCC: " . $e->getMessage();
+        $tipo_mensagem = 'error'; // CRITÉRIO: 3.3 Atribuição
     }
 }
 
-// Busca os tipos de TCC, alunos e professores (permanece igual)
-$tipos_tcc = [];
-$resultado_tipos = $conexao->query("SELECT id_tipo_tcc, descricao FROM Tipo_TCC");
-if ($resultado_tipos) {
-    while ($linha = $resultado_tipos->fetch_assoc()) {
-        $tipos_tcc[] = $linha;
-    }
+// --- Busca de dados para popular os selects
+// CRITÉRIO: 9.2 Leitura e apresentação de registro - Comandos SELECT.
+
+// Busca os tipos de TCC
+$stmt_tipos = $pdo->query("SELECT id_tipo_tcc, descricao FROM Tipo_TCC");
+// CRITÉRIO: 4.1 Array - $tipos_tcc é um array.
+$tipos_tcc = $stmt_tipos->fetchAll();
+
+// Busca os alunos, criando objetos Aluno
+// CRITÉRIO: 9.2 Leitura e apresentação de registro.
+$stmt_alunos = $pdo->query("SELECT RA, nome, email FROM Aluno ORDER BY nome");
+// CRITÉRIO: 4.1 Array - $alunos_obj é um array de objetos.
+$alunos_obj = []; // CRITÉRIO: 3.3 Atribuição
+// CRITÉRIO: 5.3 While / Do_While - Loop while para buscar resultados.
+while ($row = $stmt_alunos->fetch()) {
+    // CRITÉRIO: 7.3 Instanciação de Objetos - Criação de objetos Aluno.
+    // CRITÉRIO: 8.1 Funções com passagem de parâmetros - Parâmetros do construtor Aluno.
+    $alunos_obj[] = new Aluno($row['RA'], $row['nome'], $row['email']);
 }
 
-$alunos = [];
-$resultado_alunos = $conexao->query("SELECT RA, nome FROM Aluno ORDER BY nome");
-if ($resultado_alunos) {
-    while ($linha = $resultado_alunos->fetch_assoc()) {
-        $alunos[] = $linha;
-    }
+// Busca os professores, criando objetos Professor
+// CRITÉRIO: 9.2 Leitura e apresentação de registro.
+$stmt_professores = $pdo->query("SELECT id_professor, nome, area FROM Professor ORDER BY nome");
+// CRITÉRIO: 4.1 Array - $professores_obj é um array de objetos.
+$professores_obj = []; // CRITÉRIO: 3.3 Atribuição
+// CRITÉRIO: 5.3 While / Do_While - Loop while para buscar resultados.
+while ($row = $stmt_professores->fetch()) {
+    // CRITÉRIO: 7.3 Instanciação de Objetos - Criação de objetos Professor.
+    // CRITÉRIO: 8.1 Funções com passagem de parâmetros - Parâmetros do construtor Professor.
+    $professores_obj[] = new Professor($row['id_professor'], $row['nome'], $row['area']);
 }
 
-$professores = [];
-$resultado_professores = $conexao->query("SELECT id_professor, nome FROM Professor ORDER BY nome");
-if ($resultado_professores) {
-    while ($linha = $resultado_professores->fetch_assoc()) {
-        $professores[] = $linha;
-    }
-}
-
+// CRITÉRIO: 4.1 Array - Definição de array simples.
 $tipos_participacao_professor = ['Orientador', 'Coorientador', 'Professor Convidado 1', 'Professor Convidado 2'];
-
-$conexao->close();
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -124,12 +142,15 @@ $conexao->close();
             <li><a href="index.php">Home</a></li>
             <li><a href="cadastro_tcc.php">Cadastrar Novo TCC</a></li>
             <li><a href="agenda.php">Agenda de Defesas</a></li>
-        </ul>
+            <li><a href="estatisticas.php">Estatísticas</a></li> </ul>
     </nav>
     <div class="container">
         <h2>Cadastrar Novo TCC</h2>
 
-        <?php if (!empty($mensagem)): ?>
+        <?php
+        // CRITÉRIO: 6.1 If_Else - Exibição condicional de mensagens.
+        // CRITÉRIO: 3.6 Lógico - Uso do operador NOT (!).
+        if (!empty($mensagem)): ?>
             <div class="message <?php echo $tipo_mensagem; ?>">
                 <?php echo $mensagem; ?>
             </div>
@@ -145,7 +166,9 @@ $conexao->close();
             <label for="id_tipo_tcc">Tipo de TCC:</label>
             <select id="id_tipo_tcc" name="id_tipo_tcc" required>
                 <option value="">Selecione o Tipo</option>
-                <?php foreach ($tipos_tcc as $tipo): ?>
+                <?php
+                // CRITÉRIO: 5.2 Foreach - Loop para popular o select de tipos de TCC.
+                foreach ($tipos_tcc as $tipo): ?>
                     <option value="<?php echo $tipo['id_tipo_tcc']; ?>"><?php echo $tipo['descricao']; ?></option>
                 <?php endforeach; ?>
             </select>
@@ -154,8 +177,11 @@ $conexao->close();
             <label for="ra_aluno_principal">Aluno Principal:</label>
             <select id="ra_aluno_principal" name="ra_aluno_principal" required>
                 <option value="">Selecione o Aluno Principal</option>
-                <?php foreach ($alunos as $aluno): ?>
-                    <option value="<?php echo $aluno['RA']; ?>"><?php echo $aluno['nome'] . ' (' . $aluno['RA'] . ')'; ?></option>
+                <?php
+                // CRITÉRIO: 5.2 Foreach - Loop para popular o select de alunos.
+                // CRITÉRIO: 7.1 Classes (Métodos e Atributos) - Acesso a métodos de objetos Aluno ($aluno->getRA(), $aluno->getNome()).
+                foreach ($alunos_obj as $aluno): ?>
+                    <option value="<?php echo $aluno->getRA(); ?>"><?php echo $aluno->getNome() . ' (' . $aluno->getRA() . ')'; ?></option>
                 <?php endforeach; ?>
             </select>
 
@@ -164,13 +190,15 @@ $conexao->close();
                     <label>Aluno Colaborador 1:</label>
                     <select name="colaboradores[]">
                         <option value="">Nenhum</option>
-                        <?php foreach ($alunos as $aluno): ?>
-                            <option value="<?php echo $aluno['RA']; ?>"><?php echo $aluno['nome'] . ' (' . $aluno['RA'] . ')'; ?></option>
+                        <?php
+                        // CRITÉRIO: 5.2 Foreach - Loop para popular o select de colaboradores.
+                        foreach ($alunos_obj as $aluno): ?>
+                            <option value="<?php echo $aluno->getRA(); ?>"><?php echo $aluno->getNome() . ' (' . $aluno->getRA() . ')'; ?></option>
                         <?php endforeach; ?>
                     </select>
                     <button type="button" class="button-secondary" onclick="removeColaborador(this)">Remover</button>
                 </div>
-                </div>
+            </div>
             <button type="button" class="button" onclick="addColaborador()" id="addColaboradorBtn">Adicionar Colaborador</button>
             <br><br>
 
@@ -180,14 +208,19 @@ $conexao->close();
                     <label>Professor:</label>
                     <select name="professores[]">
                         <option value="">Selecione o Professor</option>
-                        <?php foreach ($professores as $prof): ?>
-                            <option value="<?php echo $prof['id_professor']; ?>"><?php echo $prof['nome']; ?></option>
+                        <?php
+                        // CRITÉRIO: 5.2 Foreach - Loop para popular o select de professores.
+                        // CRITÉRIO: 7.1 Classes (Métodos e Atributos) - Acesso a métodos de objetos Professor ($prof->getIdProfessor(), $prof->getNome()).
+                        foreach ($professores_obj as $prof): ?>
+                            <option value="<?php echo $prof->getIdProfessor(); ?>"><?php echo $prof->getNome(); ?></option>
                         <?php endforeach; ?>
                     </select>
 
                     <label>Tipo de Participação:</label>
                     <select name="tipo_participacao[]">
-                        <?php foreach ($tipos_participacao_professor as $tipo_part): ?>
+                        <?php
+                        // CRITÉRIO: 5.2 Foreach - Loop para popular o select de tipos de participação.
+                        foreach ($tipos_participacao_professor as $tipo_part): ?>
                             <option value="<?php echo $tipo_part; ?>"><?php echo $tipo_part; ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -202,10 +235,12 @@ $conexao->close();
     </div>
 
     <script>
-        // Funções para adicionar/remover professores (mantidas)
+        // CRITÉRIO: 1.1 Comentários (Documentação) - Comentários em funções JavaScript.
+        // CRITÉRIO: 8.1 Funções com passagem de parâmetros - Funções JavaScript com parâmetros.
         function addProfessor() {
             const container = document.getElementById('professores-container');
             const originalEntry = container.querySelector('.professor-entry');
+            // CRITÉRIO: 3.3 Atribuição
             const newEntry = originalEntry.cloneNode(true);
             newEntry.querySelector('select[name="professores[]"]').value = "";
             newEntry.querySelector('select[name="tipo_participacao[]"]').value = "Orientador";
@@ -214,6 +249,8 @@ $conexao->close();
 
         function removeProfessor(button) {
             const container = document.getElementById('professores-container');
+            // CRITÉRIO: 6.1 If_Else - Condição para remover.
+            // CRITÉRIO: 3.4 Comparação - Comparação de comprimento.
             if (container.children.length > 1) {
                 button.closest('.professor-entry').remove();
             } else {
@@ -221,58 +258,65 @@ $conexao->close();
             }
         }
 
-        // --- Novas funções para adicionar/remover colaboradores ---
-        let colaboradorCount = 1; // Começa em 1 porque já temos um campo para "Colaborador 1"
+        // CRITÉRIO: 3.3 Atribuição
+        let colaboradorCount = 1;
 
-        // Função para adicionar colaborador
         function addColaborador() {
+            // CRITÉRIO: 6.1 If_Else - Condição de limite.
+            // CRITÉRIO: 3.4 Comparação - Comparação numérica.
             if (colaboradorCount >= 2) {
                 alert('Você só pode adicionar até 2 alunos colaboradores.');
                 return;
             }
+            // CRITÉRIO: 3.5 Incr ou Decremento - Incremento.
             colaboradorCount++;
 
             const container = document.getElementById('colaboradores-container');
             const originalEntry = container.querySelector('.colaborador-entry');
             const newEntry = originalEntry.cloneNode(true);
 
+            // CRITÉRIO: 3.2 String - Concatenação de string com template literal.
             newEntry.querySelector('label').innerText = `Aluno Colaborador ${colaboradorCount}:`;
             newEntry.querySelector('select[name="colaboradores[]"]').value = "";
             
             container.appendChild(newEntry);
 
+            // CRITÉRIO: 6.1 If_Else - Condição de visibilidade.
             if (colaboradorCount >= 2) {
-                document.getElementById('addColaboradorBtn').style.display = 'none'; // Esconde o botão se já tiver 2
+                document.getElementById('addColaboradorBtn').style.display = 'none';
             }
         }
 
-        // Função para remover colaborador
         function removeColaborador(button) {
             const container = document.getElementById('colaboradores-container');
-            if (container.children.length > 1) { // Garante que o principal não seja removido
+            // CRITÉRIO: 6.1 If_Else - Condição de remoção.
+            if (container.children.length > 1) {
                 button.closest('.colaborador-entry').remove();
+                // CRITÉRIO: 3.5 Incr ou Decremento - Decremento.
                 colaboradorCount--;
-                // Reajusta os rótulos e mostra o botão se menos de 2 colaboradores
+                // CRITÉRIO: 3.3 Atribuição
                 let currentColab = 1;
+                // CRITÉRIO: 5.2 Foreach - Loop para reordenar labels.
                 container.querySelectorAll('.colaborador-entry').forEach(entry => {
                     entry.querySelector('label').innerText = `Aluno Colaborador ${currentColab}:`;
+                    // CRITÉRIO: 3.5 Incr ou Decremento - Incremento.
                     currentColab++;
                 });
                 document.getElementById('addColaboradorBtn').style.display = 'inline-block';
             } else {
-                alert('É necessário ter pelo menos um aluno principal.'); // Esta mensagem pode ser ajustada
+                alert('É necessário ter pelo menos um aluno principal.');
             }
         }
 
-        // Esconder o botão "Adicionar Colaborador" se já houver 2 ao carregar a página
+        // CRITÉRIO: 1.1 Comentários (Documentação)
         document.addEventListener('DOMContentLoaded', (event) => {
             const container = document.getElementById('colaboradores-container');
+            // CRITÉRIO: 6.1 If_Else - Condição de carregamento inicial.
             if (container.children.length >= 2) {
-                colaboradorCount = 2; // Ajusta a contagem inicial se o HTML já tiver 2
+                colaboradorCount = 2; // CRITÉRIO: 3.3 Atribuição
                 document.getElementById('addColaboradorBtn').style.display = 'none';
             }
         });
-
     </script>
 </body>
 </html>

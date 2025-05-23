@@ -16,7 +16,7 @@
             <li><a href="index.php">Home</a></li>
             <li><a href="cadastro_tcc.php">Cadastrar Novo TCC</a></li>
             <li><a href="agenda.php">Agenda de Defesas</a></li>
-        </ul>
+            <li><a href="estatisticas.php">Estatísticas</a></li> </ul>
     </nav>
     <div class="container">
         <h2>Bem-vindo(a) ao Sistema de Gerenciamento de TCC</h2>
