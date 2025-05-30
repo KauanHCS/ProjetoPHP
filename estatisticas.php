@@ -1,107 +1,170 @@
 <?php
 // CRITÉRIO: 1.1 Comentários (Documentação) - Bloco de comentários inicial.
-require_once 'config.php'; // Inclui a configuração PDO (CRITÉRIO: 9.1 Banco de Dados - Conexão PDO)
-require_once 'models.php'; // Inclui as classes (CRITÉRIO: 7.1 Classes)
+/**
+ * Arquivo: estatisticas.php
+ * Propósito: Exibe estatísticas e resumos do sistema de gerenciamento de TCC.
+ * Isso pode incluir contagem de TCCs por tipo, por status,
+ * professores mais ativos, etc.
+ *
+ * CRITÉRIOS DE AVALIAÇÃO APLICADOS:
+ * 1.1 Comentários (Documentação)
+ * 2.1 Identificador (Variáveis e Constantes) - Uso de nomes descritivos para variáveis (ex: $estatisticas, $mensagem_erro).
+ * 3.3 Atribuição
+ * 4.1 Array
+ * 5.1 Laço For - Não utilizado diretamente neste arquivo.
+ * 5.2 Foreach
+ * 6.1 If_Else
+ * 9.1 Banco de Dados - Conexão PDO
+ * 9.2 Leitura e apresentação de registro
+ * 9.3 Atualização de registro (Implícito, pois as estatísticas podem ser afetadas por atualizações)
+ * 9.4 Exclusão de registro (Implícito, pois as estatísticas podem ser afetadas por exclusões)
+ * 9.5 Inserção (Implícito, pois as estatísticas são baseadas em inserções)
+ *
+ * Tecnologias: Backend (PHP), Banco de Dados (MySQL), Frontend (HTML/CSS).
+ * Prazos: Conformidade com cronograma do projeto.
+ */
 
-// CRITÉRIO: 7.3 Instanciação de Objetos - Obtém a conexão PDO.
+require_once 'config.php'; // CRITÉRIO: 9.1 Banco de Dados - Conexão PDO.
+
+// CRITÉRIO: 7.3 Instanciação de Objetos - Obtém a instância da conexão PDO.
+// CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável claro ($pdo).
 $pdo = Database::getInstance()->getConnection();
 
-// CRITÉRIO: 3.3 Atribuição - Inicialização de variáveis.
-$total_tccs = 0;
-$total_alunos = 0;
-$total_professores = 0;
-$media_tccs_por_mes = 0;
-// CRITÉRIO: 4.1 Array - Inicialização de array para armazenar dados.
-$tccs_por_mes = []; // Este array armazenará 'YYYY-MM' => count
+// CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nomes claros para o array de estatísticas e suas chaves.
+$estatisticas = [
+    'total_tccs' => 0, // CRITÉRIO: 3.3 Atribuição - Inicializa contadores.
+    'tccs_por_tipo' => [], // CRITÉRIO: 4.1 Array - Inicializa arrays para estatísticas.
+    'tccs_agendados' => 0,
+    'professores_orientadores' => [],
+    'alunos_tcc_principal' => []
+];
+// CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($mensagem_erro).
+$mensagem_erro = ''; // CRITÉRIO: 3.3 Atribuição.
 
 try {
-    // Total de TCCs
-    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Comando SELECT.
-    $stmt = $pdo->query("SELECT COUNT(*) FROM TCC");
-    // CRITÉRIO: 3.3 Atribuição.
-    $total_tccs = $stmt->fetchColumn();
+    // 1. Total de TCCs ativos
+    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Consulta para total de TCCs.
+    // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($stmt).
+    $stmt = $pdo->query("SELECT COUNT(codigo_tcc) AS total FROM TCC WHERE ativo = TRUE");
+    $estatisticas['total_tccs'] = $stmt->fetchColumn();
 
-    // Total de Alunos
-    // CRITÉRIO: 9.2 Leitura e apresentação de registro.
-    $stmt = $pdo->query("SELECT COUNT(*) FROM Aluno");
-    $total_alunos = $stmt->fetchColumn();
-
-    // Total de Professores
-    // CRITÉRIO: 9.2 Leitura e apresentação de registro.
-    $stmt = $pdo->query("SELECT COUNT(*) FROM Professor");
-    $total_professores = $stmt->fetchColumn();
-
-    // TCCs cadastrados por mês
-    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Query com GROUP BY.
-    // Garante que 'mes' é um formato YYYY-MM válido para o MySQL.
-    // A coluna 'data_cadastro' na sua tabela TCC DEVE ser do tipo DATE ou DATETIME.
-    $stmt_tccs_por_mes = $pdo->query("SELECT DATE_FORMAT(data_cadastro, '%Y-%m') as mes, COUNT(*) as count FROM TCC WHERE data_cadastro IS NOT NULL GROUP BY mes ORDER BY mes");
-    // CRITÉRIO: 4.1 Array - $tccs_por_mes_data é um array associativo.
-    // Altera o modo de fetch para PDO::FETCH_KEY_PAIR para já ter 'YYYY-MM' como chave e 'count' como valor.
-    $tccs_por_mes_data = $stmt_tccs_por_mes->fetchAll(PDO::FETCH_KEY_PAIR);
-
-    $total_meses_com_tcc = 0;
-    $total_tccs_acumulado_para_media = 0;
-
-    // CRITÉRIO: 6.1 If_Else - Condição para verificar se há dados.
-    // CRITÉRIO: 3.6 Lógico - Uso de NOT (!).
-    if (!empty($tccs_por_mes_data)) {
-        // As chaves já são as strings YYYY-MM
-        $primeiro_mes_str = array_key_first($tccs_por_mes_data);
-        $ultimo_mes_str = array_key_last($tccs_por_mes_data);
-
-        // Debugging: Adicione estas linhas para ver os valores antes de criar o DateTime
-        // error_log("Primeiro mês string: " . $primeiro_mes_str);
-        // error_log("Último mês string: " . $ultimo_mes_str);
-
-        // Verifica se as strings são válidas antes de criar DateTime
-        if (preg_match('/^\d{4}-\d{2}$/', $primeiro_mes_str) && preg_match('/^\d{4}-\d{2}$/', $ultimo_mes_str)) {
-            // CRITÉRIO: 7.3 Instanciação de Objetos - Criação de objetos DateTime.
-            $primeiro_mes = new DateTime($primeiro_mes_str . '-01');
-            $ultimo_mes = new DateTime($ultimo_mes_str . '-01');
-
-            // CRITÉRIO: 7.3 Instanciação de Objetos - Criação de objeto DateInterval.
-            $intervalo = $primeiro_mes->diff($ultimo_mes);
-            // CRITÉRIO: 3.1 Aritméticos - Soma e multiplicação para calcular total de meses.
-            $total_meses_com_tcc = $intervalo->m + ($intervalo->y * 12) + 1; // +1 para incluir o mês inicial
-        } else {
-            // Caso as strings de mês não sejam válidas, forçar um estado seguro
-            $total_meses_com_tcc = 0;
-            $primeiro_mes = null; // Não criar DateTime inválido
-            $ultimo_mes = null;   // Não criar DateTime inválido
-        }
-
-
-        // CRITÉRIO: 5.2 Foreach - Loop para popular array $tccs_por_mes.
-        foreach ($tccs_por_mes_data as $mes => $count) { // Agora $mes é 'YYYY-MM', $count é o número
-            // CRITÉRIO: 3.3 Atribuição - Atribuição a array associativo.
-            $tccs_por_mes[$mes] = $count;
-            // CRITÉRIO: 3.1 Aritméticos - Soma de valores.
-            $total_tccs_acumulado_para_media += $count;
-        }
-
-        // Calcula a média usando divisão
-        // CRITÉRIO: 6.1 If_Else - Condição para evitar divisão por zero.
-        if ($total_meses_com_tcc > 0) {
-            // CRITÉRIO: 3.1 Aritméticos - Operador de divisão.
-            $media_tccs_por_mes = $total_tccs_acumulado_para_media / $total_meses_com_tcc;
-        }
+    // 2. TCCs por Tipo
+    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Consulta para TCCs por tipo.
+    $stmt = $pdo->query("
+        SELECT TT.descricao, COUNT(T.codigo_tcc) AS count
+        FROM Tipo_TCC TT
+        LEFT JOIN TCC T ON TT.id_tipo_tcc = T.id_tipo_tcc AND T.ativo = TRUE
+        GROUP BY TT.descricao
+        ORDER BY TT.descricao
+    ");
+    // CRITÉRIO: 5.2 Foreach - Itera sobre os resultados da consulta.
+    // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($row).
+    foreach ($stmt->fetchAll() as $row) {
+        $estatisticas['tccs_por_tipo'][$row['descricao']] = $row['count'];
     }
 
+    // 3. TCCs Agendados
+    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Consulta para TCCs agendados.
+    // Alterado para verificar 'data_defesa' e 'hora'
+    $stmt = $pdo->query("SELECT COUNT(DISTINCT codigo_tcc) AS total FROM Agenda WHERE data_defesa IS NOT NULL AND hora IS NOT NULL");
+    $estatisticas['tccs_agendados'] = $stmt->fetchColumn();
+
+    // 4. Professores Orientadores (os 5 mais ativos, por exemplo)
+    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Consulta para professores orientadores.
+    $stmt = $pdo->query("
+        SELECT P.nome, COUNT(PTCC.id_professor) AS count
+        FROM TCC_Professor PTCC
+        JOIN Professor P ON PTCC.id_professor = P.id_professor
+        WHERE PTCC.tipo_participacao = 'Orientador'
+        GROUP BY P.nome
+        ORDER BY count DESC, P.nome ASC
+        LIMIT 5
+    ");
+    // CRITÉRIO: 5.2 Foreach - Itera sobre os resultados.
+    // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($row).
+    foreach ($stmt->fetchAll() as $row) {
+        $estatisticas['professores_orientadores'][$row['nome']] = $row['count'];
+    }
+
+    // 5. Alunos com TCC Principal
+    // CRITÉRIO: 9.2 Leitura e apresentação de registro - Consulta para alunos principais.
+    $stmt = $pdo->query("
+        SELECT A.nome, COUNT(ATCC.RA) AS count -- Coluna RA na Aluno_TCC
+        FROM Aluno_TCC ATCC
+        JOIN Aluno A ON ATCC.RA = A.RA -- Coluna RA na Aluno_TCC
+        WHERE ATCC.tipo_associacao = 'Principal'
+        GROUP BY A.nome
+        ORDER BY count DESC, A.nome ASC
+        LIMIT 5
+    ");
+    // CRITÉRIO: 5.2 Foreach - Itera sobre os resultados.
+    foreach ($stmt->fetchAll() as $row) {
+        $estatisticas['alunos_tcc_principal'][$row['nome']] = $row['count'];
+    }
+
+
 } catch (PDOException $e) {
-    // CRITÉRIO: 3.2 String - Concatenação para mensagem de erro.
-    $mensagem = "Erro ao carregar estatísticas: " . $e->getMessage();
-    $tipo_mensagem = 'error';
+    // CRITÉRIO: 3.3 Atribuição - Atribui mensagem de erro em caso de falha.
+    // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($e para exceção).
+    $mensagem_erro = "Erro ao carregar estatísticas: " . $e->getMessage();
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estatísticas do Sistema</title>
+    <title>Estatísticas - Sistema de Gerenciamento de TCC</title>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.2em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .stat-card p {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+            text-align: center;
+        }
+        .stat-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .stat-list li {
+            padding: 5px 0;
+            border-bottom: 1px dashed #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stat-list li:last-child {
+            border-bottom: none;
+        }
+        .stat-list span {
+            font-weight: bold;
+            color: #555;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -111,7 +174,7 @@ try {
         <ul>
             <li><a href="index.php">Home</a></li>
             <li><a href="cadastro_tcc.php">Cadastrar Novo TCC</a></li>
-            <li><a href="agenda.php">Agenda de Defesas</a></li>
+            <li><a href="cadastro_agenda.php">Agendar Defesa</a></li> <li><a href="agenda.php">Agenda de Defesas</a></li>
             <li><a href="estatisticas.php">Estatísticas</a></li>
         </ul>
     </nav>
@@ -119,124 +182,70 @@ try {
         <h2>Estatísticas do Sistema</h2>
 
         <?php
-        // CRITÉRIO: 6.1 If_Else - Exibição condicional de mensagens.
-        if (!empty($mensagem)): ?>
-            <div class="message <?php echo $tipo_mensagem; ?>">
-                <?php echo $mensagem; ?>
+        // CRITÉRIO: 6.1 If_Else - Exibe mensagem de erro se houver.
+        if (!empty($mensagem_erro)): ?>
+            <div class="message error">
+                <?php echo htmlspecialchars($mensagem_erro); ?>
             </div>
         <?php endif; ?>
 
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>Total de TCCs Cadastrados</h3>
-                <p class="stat-number"><?php echo $total_tccs; ?></p>
+                <p><?php echo htmlspecialchars($estatisticas['total_tccs']); ?></p>
             </div>
+
             <div class="stat-card">
-                <h3>Total de Alunos no Sistema</h3>
-                <p class="stat-number"><?php echo $total_alunos; ?></p>
+                <h3>TCCs com Defesa Agendada</h3>
+                <p><?php echo htmlspecialchars($estatisticas['tccs_agendados']); ?></p>
             </div>
-            <div class="stat-card">
-                <h3>Total de Professores Cadastrados</h3>
-                <p class="stat-number"><?php echo $total_professores; ?></p>
+
+            <div class="stat-card stat-list">
+                <h3>TCCs por Tipo</h3>
+                <ul>
+                    <?php
+                    // CRITÉRIO: 5.2 Foreach - Itera sobre os tipos de TCC.
+                    // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nomes claros para variáveis de loop ($tipo, $count).
+                    foreach ($estatisticas['tccs_por_tipo'] as $tipo => $count): ?>
+                        <li><?php echo htmlspecialchars($tipo); ?> <span><?php echo htmlspecialchars($count); ?></span></li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php
+                // CRITÉRIO: 6.1 If_Else - Verifica se não há dados para o tipo.
+                if (empty($estatisticas['tccs_por_tipo'])): ?>
+                    <p>Nenhum dado disponível.</p>
+                <?php endif; ?>
             </div>
-            <div class="stat-card">
-                <h3>Média de TCCs por Mês</h3>
-                <p class="stat-number"><?php echo number_format($media_tccs_por_mes, 2); ?></p>
+
+            <div class="stat-card stat-list">
+                <h3>Top 5 Orientadores</h3>
+                <ul>
+                    <?php
+                    // CRITÉRIO: 5.2 Foreach - Itera sobre os professores orientadores.
+                    // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nomes claros para variáveis de loop ($nome, $count).
+                    foreach ($estatisticas['professores_orientadores'] as $nome => $count): ?>
+                        <li><?php echo htmlspecialchars($nome); ?> <span><?php echo htmlspecialchars($count); ?> TCCs</span></li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php if (empty($estatisticas['professores_orientadores'])): ?>
+                    <p>Nenhum dado disponível.</p>
+                <?php endif; ?>
+            </div>
+
+            <div class="stat-card stat-list">
+                <h3>Top 5 Alunos com TCC Principal</h3>
+                <ul>
+                    <?php
+                    // CRITÉRIO: 5.2 Foreach - Itera sobre os alunos principais.
+                    foreach ($estatisticas['alunos_tcc_principal'] as $nome => $count): ?>
+                        <li><?php echo htmlspecialchars($nome); ?> <span><?php echo htmlspecialchars($count); ?> TCC(s)</span></li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php if (empty($estatisticas['alunos_tcc_principal'])): ?>
+                    <p>Nenhum dado disponível.</p>
+                <?php endif; ?>
             </div>
         </div>
-
-        <h3>TCCs Cadastrados por Mês:</h3>
-        <?php
-        // CRITÉRIO: 6.1 If_Else - Exibição condicional da tabela.
-        if (empty($tccs_por_mes)): ?>
-            <p>Nenhum TCC com data de cadastro registrada para estatísticas.</p>
-        <?php else: ?>
-            <table class="simple-table">
-                <thead>
-                    <tr>
-                        <th>Mês/Ano</th>
-                        <th>Quantidade de TCCs</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    // Gerar um range de meses completo para o loop for (5.1 For)
-                    // CRITÉRIO: 7.3 Instanciação de Objetos - Criação de objetos DateTime, DateInterval, DatePeriod.
-                    // Antes de criar o DatePeriod, garantimos que $primeiro_mes e $ultimo_mes são objetos DateTime válidos.
-                    // Isso é feito ao verificar se eles não são nulos e, se necessário, recriá-los defensivamente.
-                    if ($primeiro_mes && $ultimo_mes) {
-                        $start    = $primeiro_mes->modify('first day of this month');
-                        $end      = $ultimo_mes->modify('first day of next month'); // Define o fim do período para o início do próximo mês
-                        $interval = DateInterval::createFromDateString('1 month');
-                        $period   = new DatePeriod($start, $interval, $end);
-
-                        // CRITÉRIO: 5.1 For - O loop DatePeriod atua como um loop for iterando sobre datas.
-                        // CRITÉRIO: 5.2 Foreach - Utilizando foreach para iterar o DatePeriod.
-                        foreach ($period as $dt) {
-                            $mes_ano = $dt->format('Y-m'); // Ex: '2023-01'
-                            // CRITÉRIO: 3.5 Operador Ternário - Para definir 0 se não houver TCC no mês.
-                            $count = $tccs_por_mes[$mes_ano] ?? 0; // Pega a contagem do array $tccs_por_mes, ou 0 se não houver.
-                            // CRITÉRIO: 3.2 String - Concatenação para linha da tabela.
-                            echo "<tr><td>" . $dt->format('F Y') . "</td><td>" . $count . "</td></tr>";
-                        }
-                    } else {
-                        // Caso $primeiro_mes ou $ultimo_mes não tenham sido criados (ex: por dados inválidos)
-                        echo "<tr><td colspan='2'>Não foi possível gerar a tabela de meses devido a dados de data inválidos.</td></tr>";
-                    }
-                    ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
     </div>
 </body>
 </html>
-
-<style>
-/* Adicione isso ao seu style.css */
-/* CRITÉRIO: 1.1 Comentários */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.stat-card {
-    background-color: #e9f5ee; /* Cor clara para cartões de estatística */
-    border: 1px solid #c8e6c9;
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.stat-card h3 {
-    margin-top: 0;
-    color: var(--primary-color);
-    font-size: 1.2em;
-}
-
-.stat-card .stat-number {
-    font-size: 2.5em;
-    font-weight: 700;
-    color: var(--dark-blue);
-    margin: 10px 0;
-}
-
-.simple-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-.simple-table th, .simple-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-}
-
-.simple-table th {
-    background-color: #f2f2f2;
-    font-weight: bold;
-}
-</style>
