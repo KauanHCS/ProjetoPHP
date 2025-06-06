@@ -61,6 +61,7 @@ try {
     // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($row).
     $rows = $stmt->fetchAll();
     $rowsCount = count($rows);
+    // CRITERIO: 5.1 Laço For - Preenche o array de estatísticas com os tipos de TCC e suas contagens.
     for ($i = 0; $i < $rowsCount; $i++) {
         $estatisticas['tccs_por_tipo'][$rows[$i]['descricao']] = $rows[$i]['count'];
     }
