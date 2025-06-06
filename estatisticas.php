@@ -57,10 +57,12 @@ try {
         GROUP BY TT.descricao
         ORDER BY TT.descricao
     ");
-    // CRITÉRIO: 5.2 Foreach - Itera sobre os resultados da consulta.
+    // CRITÉRIO: 5.1 Laço For - Itera sobre os resultados da consulta.
     // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nome de variável clara ($row).
-    foreach ($stmt->fetchAll() as $row) {
-        $estatisticas['tccs_por_tipo'][$row['descricao']] = $row['count'];
+    $rows = $stmt->fetchAll();
+    $rowsCount = count($rows);
+    for ($i = 0; $i < $rowsCount; $i++) {
+        $estatisticas['tccs_por_tipo'][$rows[$i]['descricao']] = $rows[$i]['count'];
     }
 
     // 3. TCCs Agendados
