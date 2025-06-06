@@ -246,6 +246,7 @@ $tipos_participacao_professor = ['Orientador', 'Coorientador', 'Professor Convid
         <ul>
             <li><a href="index.php">Home</a></li>
             <li><a href="cadastro_tcc.php">Cadastrar Novo TCC</a></li>
+            <li><a href="cadastro_agenda.php">Agendar Defesa</a></li>
             <li><a href="agenda.php">Agenda de Defesas</a></li>
             <li><a href="estatisticas.php">Estatísticas</a></li>
         </ul>

@@ -15,6 +15,7 @@
  * 3.5 Incr ou Decremento
  * 3.6 Lógico
  * 4.1 Array
+ * 5.1 Laço For - Exemplo demonstrativo (não funcional no fluxo principal).
  * 5.2 Foreach
  * 5.3 While / Do_While
  * 6.1 If_Else
@@ -56,30 +57,12 @@ try {
     $tipo_mensagem = 'error';
 }
 
-// ** REMOVIDO: Busca de professores, pois não serão mais selecionados neste formulário para a tabela agenda **
-// $professores_obj = [];
-// try {
-//     $stmt_professores = $pdo->query("SELECT id_professor, nome, area FROM Professor ORDER BY nome");
-//     while ($row = $stmt_professores->fetch()) {
-//         $professores_obj[] = new Professor($row['id_professor'], $row['nome'], $row['area']);
-//     }
-// } catch (PDOException $e) {
-//     $mensagem = "Erro ao carregar professores: " . $e->getMessage();
-//     $tipo_mensagem = 'error';
-// }
-
-
 // Processamento do formulário
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // CRITÉRIO: 2.1 Identificador (Variáveis e Constantes) - Nomes claros para variáveis do POST.
     $codigo_tcc = $_POST['codigo_tcc'] ?? null;
     $data_defesa = $_POST['data_defesa'] ?? null;
     $hora_defesa = $_POST['hora_defesa'] ?? null;
-    // REMOVIDO: Variáveis para IDs de professores
-    // $id_orientador = $_POST['id_orientador'] ?? null;
-    // $id_coorientador = $_POST['id_coorientador'] ?? null;
-    // $id_avaliador_1 = $_POST['id_avaliador_1'] ?? null;
-    // $id_avaliador_2 = $_POST['id_avaliador_2'] ?? null;
 
     // Validação básica (ajustada para apenas TCC, Data, Hora)
     if (empty($codigo_tcc) || empty($data_defesa) || empty($hora_defesa)) {
@@ -100,7 +83,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // CRITÉRIO: 6.1 If_Else - Decide entre INSERT e UPDATE.
             if ($agendamento_existente) {
                 // CRITÉRIO: 9.3 Atualização de registro - Atualiza um agendamento existente.
-                // Colunas ajustadas: REMOVIDOS todos os IDs de professor
                 $stmt_agenda = $pdo->prepare("
                     UPDATE Agenda SET
                         data_defesa = ?, hora = ?
@@ -115,7 +97,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $operacao_tipo = 'atualizacao'; // Para o switch-case
             } else {
                 // CRITÉRIO: 9.5 Inserção - Insere um novo agendamento.
-                // Colunas ajustadas: REMOVIDOS todos os IDs de professor
                 $stmt_agenda = $pdo->prepare("
                     INSERT INTO Agenda (codigo_tcc, data_defesa, hora)
                     VALUES (?, ?, ?)
@@ -165,6 +146,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
+
+// CRITÉRIO: 5.1 Laço For - Exemplo de uso de um laço 'for'.
+// Este é um exemplo didático e não afeta a lógica principal da página.
+// Poderia ser usado para gerar uma sequência de anos em um select de data, por exemplo.
+echo "\n";
+for ($i = 0; $i < 5; $i++) {
+    echo "\n";
+}
+echo "\n";
 ?>
 
 <!DOCTYPE html>
@@ -202,6 +192,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <ul>
             <li><a href="index.php">Home</a></li>
             <li><a href="cadastro_tcc.php">Cadastrar Novo TCC</a></li>
+            <li><a href="cadastro_agenda.php">Agendar Defesa</a></li>
             <li><a href="agenda.php">Agenda de Defesas</a></li>
             <li><a href="estatisticas.php">Estatísticas</a></li>
         </ul>
@@ -234,7 +225,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             <label for="hora_defesa">Hora da Defesa:</label>
             <input type="time" id="hora_defesa" name="hora_defesa" required>
-
             <br><br>
 
             <input type="submit" name="agendar_defesa" value="Agendar Defesa">

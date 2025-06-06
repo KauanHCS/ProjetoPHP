@@ -35,6 +35,7 @@ class Tcc {
     private $tipo_tcc; // Descrição do tipo (ex: "Monografia")
     private $data_defesa; // Revertido para 'data_defesa'
     private $hora_defesa; // Revertido para 'hora'
+    private $id_tipo_tcc;
     public $id_agenda; // Propriedade para armazenar o ID do agendamento da defesa (se houver)
 
     // Propriedades adicionais para facilitar a exibição no HTML ou para edição
@@ -65,6 +66,23 @@ class Tcc {
         $this->tipo_tcc = $tipo_tcc;
         $this->data_defesa = $data_defesa; // Revertido
         $this->hora_defesa = $hora_defesa; // Revertido
+    }
+
+        // Dentro da classe Tcc, após o construtor ou junto com outros getters/setters
+    /**
+     * Define o ID do tipo de TCC.
+     * @param int $id_tipo_tcc
+     */
+    public function setIdTipoTcc($id_tipo_tcc) {
+        $this->id_tipo_tcc = $id_tipo_tcc;
+    }
+
+    /**
+     * Retorna o ID do tipo de TCC.
+     * @return int|null
+     */
+    public function getIdTipoTcc() {
+        return $this->id_tipo_tcc;
     }
 
     // CRITÉRIO: 7.2 Métodos e Atributos - Métodos getters para acesso aos atributos privados.
